@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Software Marketplace</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- Stripe JS -->
+  <script src="https://js.stripe.com/v3/"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f7f9fc;
+      color: #2c3e50;
+      margin: 0;
+      padding: 20px;
+    }
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 30px;
+      padding-bottom: 15px;
+      border-bottom: 1px solid #ddd;
+    }
+    h1 {
+      margin: 0;
+      color: #2980b9;
+    }
+    .welcome {
+      font-size: 1.2em;
+      color: #34495e;
+    }
+    button.upload-btn {
+      background-color: #3498db;
+      color: white;
+      padding: 10px 18px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 1rem;
+    }
+    button.upload-btn:hover {
+      background-color: #2980b9;
+    }
+    .block {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      padding: 25px;
+      margin: 25px 0;
+      transition: transform 0.2s;
+    }
+    .block:hover {
+      transform: translateY(-4px);
+    }
+    .block h2, .block h3 {
+      margin-top: 0;
+      color: #2c3e50;
+    }
+    video {
+      width: 100%;
+      max-width: 800px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .btn-group button {
+      padding: 10px 20px;
+      margin: 5px;
+      font-size: 1rem;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .btn-download {
+      background-color: #27ae60;
+      color: white;
+    }
+    .btn-download:hover {
+      background-color: #219653;
+    }
+    .btn-pay {
+      background-color: #e74c3c;
+      color: white;
+    }
+    .btn-pay:hover {
+      background-color: #c0392b;
+    }
+
+    /* Upload Modal */
+    #uploadModal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0,0,0,0.6);
+      backdrop-filter: blur(2px);
+    }
+    .modal-content {
+      background-color: white;
+      margin: 8% auto;
+      padding: 30px;
+      width: 80%;
+      max-width: 600px;
+      border-radius: 12px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+    }
+    .modal-content h2 {
+      margin-top: 0;
+      color: #2980b9;
+    }
+    .modal-content label {
+      font-weight: 600;
+      margin-top: 15px;
+      display: block;
+    }
+    .modal-content input[type="text"],
+    .modal-content input[type="number"],
+    .modal-content input[type="file"] {
+      width: 100%;
+      padding: 10px;
+      margin-top: 8px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 1rem;
+    }
+    .modal-actions {
+      margin-top: 25px;
+      text-align: right;
+    }
+    .modal-actions button {
+      padding: 10px 20px;
+      margin-left: 10px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 1rem;
+    }
+    .modal-actions .submit-btn {
+      background-color: #27ae60;
+      color: white;
+    }
+    .modal-actions .cancel-btn {
+      background-color: #95a5a6;
+      color: white;
+    }
+    .close-btn {
+      float: right;
+      font-size: 1.5rem;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .close-btn:hover {
+      color: #e74c3c;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <h1>Software Marketplace</h1>
+        <p class="welcome">Welcome, <strong id="username">User</strong>!</p>
+      </div>
+      <button class="upload-btn" onclick="showUploadForm()">📤 Upload Software</button>
+    </header>
+
+    <!-- Dynamic Software List -->
+    <div id="softwareList">
+      <p>Loading available software...</p>
+    </div>
+  </div>
+
+  <!-- Upload Modal -->
+  <div id="uploadModal">
+    <div class="modal-content">
+      <span class="close-btn" onclick="hideUploadForm()">&times;</span>
+      <h2>📤 Upload Your Software</h2>
+      <form id="uploadForm" enctype="multipart/form-data">
+        <label>Title:</label>
+        <input type="text" id="title" name="title" placeholder="Enter software title" required />
+
+        <label>Demo Video (MP4):</label>
+        <input type="file" id="video" name="video" accept="video/mp4" required />
+
+        <label>Software ZIP File:</label>
+        <input type="file" id="zipFile" name="zipFile" accept=".zip" required />
+
+        <label>Price ($):</label>
+        <input type="number" id="price" name="price" step="0.01" min="0" placeholder="e.g., 29.99" required />
+
+        <div class="modal-actions">
+          <button type="button" class="cancel-btn" onclick="hideUploadForm()">Cancel</button>
+          <button type="submit" class="submit-btn">Upload</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    // Show username from localStorage
+    document.getElementById('username').textContent = localStorage.getItem('username') || 'Guest';
+
+    // Show/hide upload modal
+    function showUploadForm() {
+      document.getElementById('uploadModal').style.display = 'block';
+    }
+    function hideUploadForm() {
+      document.getElementById('uploadModal').style.display = 'none';
+    }
+
+    // Handle upload form submission
+    document.getElementById('uploadForm').onsubmit = async (e) => {
+      e.preventDefault();
+      
+      const formData = new FormData();
+      formData.append("title", document.getElementById("title").value);
+      formData.append("video", document.getElementById("video").files[0]);
+      formData.append("zipFile", document.getElementById("zipFile").files[0]);
+      formData.append("price", document.getElementById("price").value);
+
+      const token = localStorage.getItem("token");
+
+      try {
+        const res = await fetch("http://192.168.1.40:8080/api/software/upload", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${token}`
+          },
+          body: formData
+        });
+
+        if (res.ok) {
+          alert("✅ Software uploaded successfully!");
+          hideUploadForm();
+          loadSoftwareList(); // Refresh list
+        } else {
+          const text = await res.text();
+          alert("❌ Upload failed: " + text);
+        }
+      } catch (err) {
+        console.error("Upload error:", err);
+        alert("❌ Network error: " + err.message);
+      }
+    };
+
+    // Load software list from backend
+    async function loadSoftwareList() {
+      try {
+        const res = await fetch("http://192.168.1.40:8080/api/software/list");
+        if (!res.ok) throw new Error("Failed to fetch software list");
+
+        const softwares = await res.json();
+        const container = document.getElementById("softwareList");
+
+        if (softwares.length === 0) {
+          container.innerHTML = "<p>No software available yet. Be the first to upload!</p>";
+          return;
+        }
+
+        container.innerHTML = ""; // Clear loading message
+
+        softwares.forEach(s => {
+          container.innerHTML += `
+            <div class="block">
+              <h3>${escapeHtml(s.title)}</h3>
+              <video controls>
+                <source src="http://192.168.1.40:8080${s.videoUrl}" type="video/mp4">
+                Your browser does not support the video tag.
+              </video>
+              <p><strong>Price:</strong> $${s.price.toFixed(2)}</p>
+              <div class="btn-group">
+                <a href="http://192.168.1.40:8080${s.zipUrl}" download>
+                  <button class="btn-download">📥 Download ZIP</button>
+                </a>
+                <button class="btn-pay" onclick="payForSoftware(${s.id}, ${s.price})">💳 Pay $${s.price}</button>
+              </div>
+            </div>
+          `;
+        });
+      } catch (err) {
+        console.error("Error loading software:", err);
+        document.getElementById("softwareList").innerHTML = "<p>❌ Could not load software list. Please try again later.</p>";
+      }
+    }
+
+    // Pay for software using Stripe
+    function payForSoftware(id, price) {
+      alert("Redirecting to secure payment...");
+      // In real app, call your backend to create Stripe session
+      // For demo, we simulate redirect
+      window.location.href = "https://buy.stripe.com/"; // Replace with real endpoint
+    }
+
+    // Utility to prevent XSS
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // Load software list on page load
+    window.onload = loadSoftwareList;
+  </script>
+</body>
+</html>
